@@ -8,7 +8,7 @@ try { const saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); $('ide
 function save() { try { localStorage.setItem(storageKey, JSON.stringify({idea:$('idea').value,draft:$('draft').value,angle:$('angle').value,language:$('language').value})); } catch { $('status').textContent = 'Сохранение в браузере недоступно. Скачайте текст.'; } updateCount(); }
 ['idea','draft','angle','language'].forEach(id => $(id).addEventListener('input', save));
 function controls() { ['generate','transcribe','publish','confirm'].forEach(id => $(id).disabled = busy || !configured); }
-$('connection').textContent = configured ? 'API настроен. Для работы потребуется авторизованная серверная сессия.' : 'Редактор готов. Генерация, расшифровка и публикация появятся после подключения защищённого API.';
+$('connection').textContent = configured ? 'Для AI и публикации потребуется авторизованная сессия.' : 'AI-генерация и LinkedIn ещё не подключены. Редактор, сохранение и новости уже работают.';
 controls();
 async function request(path, body, json = true, headers = {}) {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/,'')}${path}`, {method:'POST', credentials:'include', headers:{...(json ? {'Content-Type':'application/json'} : {}), ...headers}, body:json ? JSON.stringify(body) : body});
@@ -30,11 +30,11 @@ document.querySelectorAll('[data-topic]').forEach(button => button.onclick = () 
 let library = [];
 try { const data = JSON.parse(localStorage.getItem('draft-library') || '[]'); if(Array.isArray(data)) library = data; } catch {}
 function persistLibrary() { try { localStorage.setItem('draft-library',JSON.stringify(library)); return true; } catch { $('status').textContent = 'Не удалось сохранить библиотеку. Скачайте текст.'; return false; } }
-function renderLibrary() { $('draft-library').replaceChildren(); if(!library.length) { $('draft-library').textContent = 'Пока нет сохранённых версий.'; return; } library.forEach((item,index) => { const row=document.createElement('article'); row.className='library-item'; const title=document.createElement('strong'); title.textContent=String(item.draft || '').slice(0,90); const date=document.createElement('p'); date.className='muted'; date.textContent=new Date(item.date).toLocaleString('ru-RU'); const open=document.createElement('button'); open.textContent='Открыть'; open.onclick=()=>{ if(!confirm('Открыть сохранённую версию вместо текущего текста?')) return; ['idea','draft','angle'].forEach(id=>$(id).value=item[id] || ''); $('language').value=item.language || 'en'; pendingPublication=null; save(); $('draft').focus(); }; const remove=document.createElement('button'); remove.textContent='Удалить'; remove.onclick=()=>{ if(!confirm('Удалить эту версию с устройства?')) return; library.splice(index,1); persistLibrary(); renderLibrary(); }; row.append(title,date,open,remove); $('draft-library').append(row); }); }
+function renderLibrary() { $('library-count').textContent = library.length; $('draft-library').replaceChildren(); if(!library.length) { $('draft-library').textContent = 'Пока нет сохранённых версий.'; return; } library.forEach((item,index) => { const row=document.createElement('article'); row.className='library-item'; const title=document.createElement('strong'); title.textContent=String(item.draft || '').slice(0,90); const date=document.createElement('p'); date.className='muted'; date.textContent=new Date(item.date).toLocaleString('ru-RU'); const open=document.createElement('button'); open.textContent='Открыть'; open.onclick=()=>{ if(!confirm('Открыть сохранённую версию вместо текущего текста?')) return; ['idea','draft','angle'].forEach(id=>$(id).value=item[id] || ''); $('language').value=item.language || 'en'; pendingPublication=null; switchView('workspace'); setEditorMode(false); save(); $('draft').focus(); }; const remove=document.createElement('button'); remove.textContent='Удалить'; remove.onclick=()=>{ if(!confirm('Удалить эту версию с устройства?')) return; library.splice(index,1); persistLibrary(); renderLibrary(); }; row.append(title,date,open,remove); $('draft-library').append(row); }); }
 $('save-draft').onclick=()=>{ if(!$('draft').value.trim()) { $('status').textContent='Добавьте текст черновика.'; return; } library.unshift({date:new Date().toISOString(),idea:$('idea').value,draft:$('draft').value,angle:$('angle').value,language:$('language').value}); if(persistLibrary()) $('status').textContent='Версия сохранена в библиотеке.'; renderLibrary(); };
 renderLibrary();
 function safeUrl(value) { try { const url=new URL(value); return ['https:','http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null; } catch { return null; } }
-function addIdea(title,url,angle='') { $('idea').value += `${$('idea').value ? '\n\n' : ''}${title}\nИсточник: ${url}`; if(angle) $('angle').value=angle; save(); $('idea').focus(); $('status').textContent='Источник добавлен в идею. Откройте оригинал и добавьте собственный вывод.'; }
+function addIdea(title,url,angle='') { switchView('workspace'); $('idea').value += `${$('idea').value ? '\n\n' : ''}${title}\nИсточник: ${url}`; if(angle) $('angle').value=angle; save(); $('idea').focus(); $('status').textContent='Источник добавлен в идею. Откройте оригинал и добавьте собственный вывод.'; }
 import { sources } from './research.js?v=2';
 for(const source of sources) { const card=document.createElement('article'); card.className='source-card'; const tag=document.createElement('p'); tag.className='step'; tag.textContent=source.topic; const link=document.createElement('a'); link.href=source.url; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent=source.name+' ↗'; const context=document.createElement('p'); context.textContent=source.angle; const button=document.createElement('button'); button.textContent='Взять тему'; button.onclick=()=>addIdea(source.topic,source.url,source.angle); card.append(tag,link,context,button); $('source-list').append(card); }
 function showWidget(value) { const url=new URL(value); if(url.protocol!=='https:' || url.hostname!=='rss.app' || !url.pathname.startsWith('/embed/') || url.search || url.hash || url.username || url.password) throw new Error('Нужна публичная ссылка https://rss.app/embed/… без ключей и параметров.'); const iframe=document.createElement('iframe'); iframe.src=url.href; iframe.title='Новости RSS.app'; iframe.loading='eager'; iframe.referrerPolicy='no-referrer'; iframe.setAttribute('sandbox','allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox');  $('rss-widget').replaceChildren(iframe); }
@@ -64,3 +64,39 @@ async function loadNews() {
   } catch(error) { $('rss-status').textContent=error.message; }
 }
 loadNews();
+
+// Workspace navigation and presentation controls.
+function switchView(name) {
+  const valid=['workspace','library','sources']; if(!valid.includes(name)) name='workspace';
+  for(const view of valid) { const node=$('view-'+view); node.hidden=view!==name; node.classList.toggle('active-view',view===name); }
+  document.querySelectorAll('.nav-item').forEach(button=>{ const selected=button.dataset.view===name; button.classList.toggle('active',selected); if(selected) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current'); });
+  $('breadcrumb-current').textContent={workspace:'Рабочий стол',library:'Мои черновики',sources:'Источники и RSS'}[name];
+  history.replaceState(null,'','#'+name);
+  window.scrollTo({top:0,behavior:'instant'});
+}
+document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>switchView(button.dataset.view)));
+document.querySelector('.brand').addEventListener('click',event=>{event.preventDefault();switchView('workspace');});
+switchView(location.hash.slice(1)||'workspace');
+function setEditorMode(preview) {
+  $('editing-surface').hidden=preview; $('post-preview').hidden=!preview;
+  $('post-preview-text').textContent=$('draft').value.trim() || 'Здесь появится ваш текст. Перейдите в редактор, чтобы начать.';
+  $('edit-tab').classList.toggle('selected',!preview); $('preview-tab').classList.toggle('selected',preview);
+  $('edit-tab').setAttribute('aria-selected',String(!preview)); $('preview-tab').setAttribute('aria-selected',String(preview));
+}
+$('edit-tab').onclick=()=>setEditorMode(false); $('preview-tab').onclick=()=>setEditorMode(true);
+$('draft').addEventListener('input',()=>{ $('post-preview-text').textContent=$('draft').value; });
+$('audio').addEventListener('change',()=>{ $('audio-label').textContent=$('audio').files[0]?.name || 'Добавить голосовую'; });
+let selectedNewsFilter='all';
+const newsTerms={jewellery:/jewel|jewell|diamond|gemstone|cartier|bulgari|winston|cleef|ювелир|бриллиант/i,watches:/watch|horlog|zenith|timepiece|час|swiss/i,dubai:/dubai|uae|gcc|dmcc|abu dhabi|дубай|оаэ/i};
+function filterNews() {
+ const query=$('news-search').value.toLowerCase().trim(); let visible=0;
+ $('news-list').querySelectorAll('article').forEach(card=>{ const text=card.textContent.toLowerCase(); const matched=(!query||text.includes(query))&&(selectedNewsFilter==='all'||newsTerms[selectedNewsFilter].test(text)); card.hidden=!matched; if(matched) visible++; });
+ $('news-count').textContent=String(visible);
+ let empty=$('news-empty'); if(!empty) {empty=document.createElement('p');empty.id='news-empty';empty.className='news-empty';empty.textContent='По этому запросу новостей нет. Попробуйте другую тему.';$('news-list').append(empty);}
+ empty.hidden=visible>0;
+}
+$('news-search').addEventListener('input',filterNews);
+document.querySelectorAll('[data-news-filter]').forEach(button=>button.onclick=()=>{selectedNewsFilter=button.dataset.newsFilter;document.querySelectorAll('[data-news-filter]').forEach(b=>b.classList.toggle('selected',b===button));filterNews();});
+new MutationObserver(records=>{if(records.some(record=>[...record.addedNodes].some(node=>node.nodeName==='ARTICLE'))) filterNews();}).observe($('news-list'),{childList:true});
+let toastTimer;
+new MutationObserver(()=>{clearTimeout(toastTimer);if($('status').textContent)toastTimer=setTimeout(()=>$('status').textContent='',6500);}).observe($('status'),{childList:true});
