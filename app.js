@@ -1,4 +1,4 @@
-import { API_BASE_URL, RSS_WIDGET_URL } from './config.js?v=2';
+import { API_BASE_URL, RSS_WIDGET_URL } from './config.js?v=3';
 const $ = id => document.getElementById(id);
 const storageKey = 'linkedin-workshop-v1';
 const configured = /^https:\/\//.test(API_BASE_URL);
