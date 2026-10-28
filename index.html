@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LinkedIn · Мастерская идей</title>
+<link rel="stylesheet" href="./style.css">
+<script type="module" src="./app.js?v=2"></script>
+<body>
+<header><span class="brand">in<span> / мастерская</span></span><span>ВАШИ МЫСЛИ. ВАШ ГОЛОС.</span></header>
+<main>
+<p class="eyebrow">ОТ ИДЕИ К ПУБЛИКАЦИИ</p>
+<h1>Есть мысль?<br>Дайте ей форму.</h1>
+<p class="intro">Расскажите о своём опыте. Подготовьте текст, добавьте свой голос и поделитесь им, когда будете готовы.</p>
+<p id="connection" class="notice" role="status">Проверяем настройки…</p>
+<div class="topic-bar" aria-label="Темы публикаций"><button data-topic="High Jewellery: доверие, происхождение камней, мастерство">High Jewellery</button><button data-topic="Haute horlogerie: экспертиза продукта как преимущество бизнеса">Часы и экспертиза</button><button data-topic="Управление бутиком: команда, CRM и клиентский опыт">Retail leadership</button><button data-topic="Рынок luxury в Dubai / UAE: мой профессиональный взгляд">Dubai / UAE</button></div>
+<div class="workspace">
+<section><p class="step">01 / ИДЕЯ</p><h2>С чего начнём?</h2>
+<label for="audio">Загрузите голосовую запись</label><input id="audio" type="file" accept="audio/*,.m4a,.mp4,.webm">
+<button id="transcribe" type="button">Расшифровать запись</button>
+<label for="idea">Или запишите мысли текстом</label><textarea id="idea" rows="9" placeholder="Что произошло? Что вы поняли? Чем хотите поделиться?"></textarea>
+<label for="language">Язык черновика</label><select id="language"><option value="en">English</option><option value="ru">Русский</option></select>
+<label for="angle">Ваш вывод или личный пример</label><textarea id="angle" rows="3" placeholder="Почему эта тема важна для клиента, команды или бизнеса?"></textarea>
+<button id="generate" class="primary" type="button">Подготовить черновик →</button></section>
+<section><p class="step">02 / ВАШ ТЕКСТ</p><h2>Последнее слово — за вами.</h2>
+<label for="draft">Черновик публикации</label><textarea id="draft" rows="16" placeholder="Здесь появится текст. Его можно свободно менять."></textarea>
+<p class="muted">Текст сохраняется только в этом браузере. На общем устройстве используйте экспорт и очистку.</p>
+<p id="word-count" class="muted"></p><div class="actions"><button id="save-draft" type="button">В библиотеку</button><button id="download" type="button">Скачать .txt</button><button id="clear" type="button">Очистить</button><button id="publish" class="primary" type="button">Опубликовать…</button></div>
+</section></div>
+<section class="below"><p class="step">03 / НАСМОТРЕННОСТЬ</p><h2>Luxury intelligence</h2><p>Новости отрасли → ваш взгляд → новая идея для поста.</p>
+<div class="source-grid" id="source-list"></div>
+<details><summary>Подключить RSS.app или импортировать ленту</summary><p class="muted">Автоматическая лента появится после создания аккаунта и подключения источников. Для виджета RSS.app может потребоваться платный тариф.</p><label for="widget-url">Публичный iframe URL из RSS.app → Widgets → Add to Website</label><input id="widget-url" type="url" placeholder="https://rss.app/embed/…"><div class="actions"><button id="connect-widget">Показать виджет</button><button id="disconnect-widget">Отключить</button></div><label for="rss-file">Или импортируйте RSS / Atom XML с устройства</label><input id="rss-file" type="file" accept=".xml,.rss,.atom,application/xml,text/xml"><p class="muted">Импорт — разовый снимок. Заголовки можно отправить в идеи; факты проверяйте в оригинале.</p></details>
+<div id="rss-widget"></div><p id="rss-status" role="status"></p><div id="news-list" class="source-grid"></div></section>
+<section class="below"><p class="step">04 / БИБЛИОТЕКА</p><h2>Вернуться к мысли.</h2><p class="muted">Сохранённые версии доступны только на этом устройстве.</p><div id="draft-library"></div></section>
+<p id="status" role="status" aria-live="polite"></p>
+<dialog id="confirmation"><h2>Опубликовать в LinkedIn?</h2><p>Этот текст станет виден вашей аудитории.</p><pre id="preview"></pre><div class="actions"><button id="cancel" type="button">Вернуться к правкам</button><button id="confirm" class="primary" type="button">Подтверждаю публикацию</button></div></dialog>
+</main><footer>Сначала мысль. Потом черновик. Публикация — после вашего решения.</footer>
+</body></html>
