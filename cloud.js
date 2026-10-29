@@ -14,6 +14,7 @@ export async function cloudRequest(path,options={}) {
 export async function cloudJson(path,body,method='POST'){return (await cloudRequest(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();}
 export async function login(provider='github') {
  if(!cloudConfigured)throw new Error('Cloudflare ещё не подключён. Идеи пока не синхронизируются.');
+ const readiness=await(await cloudRequest('/health')).json();if(!readiness.auth?.[provider])throw new Error(provider==='linkedin'?'Вход LinkedIn ещё настраивается.':'Вход GitHub ещё настраивается.');
  const verifier=[...crypto.getRandomValues(new Uint8Array(32))].map(x=>x.toString(16).padStart(2,'0')).join('');
  const challenge=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier)))].map(x=>x.toString(16).padStart(2,'0')).join('');
  sessionStorage.setItem('atelier-login-verifier',verifier);
