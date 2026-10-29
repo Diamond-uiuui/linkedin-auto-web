@@ -1,3 +1,4 @@
+import {initEditor} from './editor.js?v=wh3';
 import {initAccounts} from './accounts.js?v=wh2';
 import {cloudRequest,cloudJson,cloudReady,hasCloudSession} from './cloud.js?v=wh2';
 import {initCapture} from './capture.js?v=cloud1';
@@ -27,7 +28,7 @@ $('publish').onclick = () => { const text = $('draft').value.trim(); if(!text) {
 $('cancel').onclick = () => $('confirmation').close();
 $('confirm').onclick = () => run(async () => { if(!pendingPublication) throw new Error('Подтвердите текст заново.'); const data = await request('/linkedin/posts', {text:pendingPublication.text, confirmed:true}, true, {'Idempotency-Key':pendingPublication.key}); if(!data.id) throw new Error('Нет подтверждения публикации. Проверьте LinkedIn перед повторной попыткой.'); $('confirmation').close(); $('status').textContent = 'Публикация подтверждена LinkedIn.'; });
 
-function updateCount() { const text = $('draft').value; $('word-count').textContent = `${text.trim() ? text.trim().split(/\s+/).length : 0} слов · ${text.length} символов`; }
+function updateCount() { const text = $('draft').value; $('word-count').textContent = `${text.trim() ? text.trim().split(/\s+/).length : 0} слов · ${text.length} / 3 000 символов`; window.dispatchEvent(new Event('wh-editor-change')); }
 updateCount();
 document.querySelectorAll('[data-topic]').forEach(button => button.onclick = () => { if($('idea').value.trim() && !confirm('Заменить текущую идею выбранной темой?')) return; $('idea').value = button.dataset.topic; save(); $('idea').focus(); });
 let library = [];
@@ -84,6 +85,7 @@ function setEditorMode(preview) {
   $('editing-surface').hidden=preview; $('post-preview').hidden=!preview;
   $('post-preview-text').textContent=$('draft').value.trim() || 'Здесь появится ваш текст. Перейдите в редактор, чтобы начать.';
   $('edit-tab').classList.toggle('selected',!preview); $('preview-tab').classList.toggle('selected',preview);
+  $('edit-tab').tabIndex=preview?-1:0; $('preview-tab').tabIndex=preview?0:-1;
   $('edit-tab').setAttribute('aria-selected',String(!preview)); $('preview-tab').setAttribute('aria-selected',String(preview));
 }
 $('edit-tab').onclick=()=>setEditorMode(false); $('preview-tab').onclick=()=>setEditorMode(true);
@@ -102,7 +104,7 @@ $('news-search').addEventListener('input',filterNews);
 document.querySelectorAll('[data-news-filter]').forEach(button=>button.onclick=()=>{selectedNewsFilter=button.dataset.newsFilter;document.querySelectorAll('[data-news-filter]').forEach(b=>b.classList.toggle('selected',b===button));filterNews();});
 new MutationObserver(records=>{if(records.some(record=>[...record.addedNodes].some(node=>node.nodeName==='ARTICLE'))) filterNews();}).observe($('news-list'),{childList:true});
 let toastTimer;
-new MutationObserver(()=>{clearTimeout(toastTimer);if($('status').textContent)toastTimer=setTimeout(()=>$('status').textContent='',6500);}).observe($('status'),{childList:true});
+new MutationObserver(()=>{clearTimeout(toastTimer);/* Status messages remain readable until the next action. */}).observe($('status'),{childList:true});
 
 initCapture({switchView,putInEditor:(value)=>{ $('idea').value=value;save();setEditorMode(false);switchView('workspace');$('idea').focus(); }});
 window.addEventListener('cloud-session',controls); cloudReady.then(controls);
@@ -111,3 +113,4 @@ async function loadCloudDrafts(){if(!hasCloudSession())return;try{const data=awa
 cloudReady.then(()=>{if(hasCloudSession())loadCloudDrafts();});window.addEventListener('cloud-session',()=>{if(hasCloudSession())loadCloudDrafts();else{try{library=JSON.parse(localStorage.getItem('draft-library')||'[]');}catch{library=[];}renderLibrary();document.querySelector('.library-banner p').textContent='Локальные версии этого браузера. Для доступа к облачной библиотеке войдите в аккаунт.';}});
 
 initAccounts();
+initEditor();
