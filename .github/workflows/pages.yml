@@ -29,7 +29,7 @@ jobs:
       - name: Stage public site only
         run: |
           mkdir _site
-          cp index.html app.js style.css config.js research.js news.json .nojekyll _site/
+          cp index.html app.js style.css config.js research.js news.json cloud.js capture.js accounts.js theme.js .nojekyll _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

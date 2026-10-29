@@ -1,4 +1,7 @@
-import { API_BASE_URL, RSS_WIDGET_URL } from './config.js?v=3';
+import {initAccounts} from './accounts.js?v=wh2';
+import {cloudRequest,cloudJson,cloudReady,hasCloudSession} from './cloud.js?v=wh2';
+import {initCapture} from './capture.js?v=cloud1';
+import { API_BASE_URL, RSS_WIDGET_URL } from './config.js?v=cloud1';
 const $ = id => document.getElementById(id);
 const storageKey = 'linkedin-workshop-v1';
 const configured = /^https:\/\//.test(API_BASE_URL);
@@ -7,11 +10,11 @@ let pendingPublication = null;
 try { const saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); $('idea').value = saved.idea || ''; $('draft').value = saved.draft || ''; $('angle').value = saved.angle || ''; $('language').value = saved.language || 'en'; } catch { $('status').textContent = 'Не удалось восстановить локальный черновик.'; }
 function save() { try { localStorage.setItem(storageKey, JSON.stringify({idea:$('idea').value,draft:$('draft').value,angle:$('angle').value,language:$('language').value})); } catch { $('status').textContent = 'Сохранение в браузере недоступно. Скачайте текст.'; } updateCount(); }
 ['idea','draft','angle','language'].forEach(id => $(id).addEventListener('input', save));
-function controls() { ['generate','transcribe','publish','confirm'].forEach(id => $(id).disabled = busy || !configured); }
+function controls() { ['generate','transcribe'].forEach(id => $(id).disabled = busy || !hasCloudSession()); ['publish','confirm'].forEach(id=>$(id).disabled=true); }
 $('connection').textContent = configured ? 'Для AI и публикации потребуется авторизованная сессия.' : 'AI-генерация и LinkedIn ещё не подключены. Редактор, сохранение и новости уже работают.';
 controls();
 async function request(path, body, json = true, headers = {}) {
-  const response = await fetch(`${API_BASE_URL.replace(/\/$/,'')}${path}`, {method:'POST', credentials:'include', headers:{...(json ? {'Content-Type':'application/json'} : {}), ...headers}, body:json ? JSON.stringify(body) : body});
+  const response = await cloudRequest(path, {method:'POST', headers:{...(json ? {'Content-Type':'application/json'} : {}), ...headers}, body:json ? JSON.stringify(body) : body});
   if (!response.ok) throw new Error(response.status === 401 ? 'Войдите в приложение через сервер авторизации.' : 'API не выполнил запрос. Повторите позже.');
   return response.json();
 }
@@ -30,8 +33,8 @@ document.querySelectorAll('[data-topic]').forEach(button => button.onclick = () 
 let library = [];
 try { const data = JSON.parse(localStorage.getItem('draft-library') || '[]'); if(Array.isArray(data)) library = data; } catch {}
 function persistLibrary() { try { localStorage.setItem('draft-library',JSON.stringify(library)); return true; } catch { $('status').textContent = 'Не удалось сохранить библиотеку. Скачайте текст.'; return false; } }
-function renderLibrary() { $('library-count').textContent = library.length; $('draft-library').replaceChildren(); if(!library.length) { $('draft-library').textContent = 'Пока нет сохранённых версий.'; return; } library.forEach((item,index) => { const row=document.createElement('article'); row.className='library-item'; const title=document.createElement('strong'); title.textContent=String(item.draft || '').slice(0,90); const date=document.createElement('p'); date.className='muted'; date.textContent=new Date(item.date).toLocaleString('ru-RU'); const open=document.createElement('button'); open.textContent='Открыть'; open.onclick=()=>{ if(!confirm('Открыть сохранённую версию вместо текущего текста?')) return; ['idea','draft','angle'].forEach(id=>$(id).value=item[id] || ''); $('language').value=item.language || 'en'; pendingPublication=null; switchView('workspace'); setEditorMode(false); save(); $('draft').focus(); }; const remove=document.createElement('button'); remove.textContent='Удалить'; remove.onclick=()=>{ if(!confirm('Удалить эту версию с устройства?')) return; library.splice(index,1); persistLibrary(); renderLibrary(); }; row.append(title,date,open,remove); $('draft-library').append(row); }); }
-$('save-draft').onclick=()=>{ if(!$('draft').value.trim()) { $('status').textContent='Добавьте текст черновика.'; return; } library.unshift({date:new Date().toISOString(),idea:$('idea').value,draft:$('draft').value,angle:$('angle').value,language:$('language').value}); if(persistLibrary()) $('status').textContent='Версия сохранена в библиотеке.'; renderLibrary(); };
+function renderLibrary() { $('library-count').textContent = library.length; $('draft-library').replaceChildren(); if(!library.length) { $('draft-library').textContent = 'Пока нет сохранённых версий.'; return; } library.forEach((item,index) => { const row=document.createElement('article'); row.className='library-item'; const title=document.createElement('strong'); title.textContent=String(item.draft || '').slice(0,90); const date=document.createElement('p'); date.className='muted'; date.textContent=new Date(item.date).toLocaleString('ru-RU'); const open=document.createElement('button'); open.textContent='Открыть'; open.onclick=()=>{ if(!confirm('Открыть сохранённую версию вместо текущего текста?')) return; ['idea','draft','angle'].forEach(id=>$(id).value=item[id] || ''); $('language').value=item.language || 'en'; pendingPublication=null; switchView('workspace'); setEditorMode(false); save(); $('draft').focus(); }; const remove=document.createElement('button'); remove.textContent='Удалить'; remove.onclick=async()=>{ if(!confirm(item.cloud?'Убрать эту версию из облачной библиотеки?':'Удалить эту версию с устройства?')) return; try {if(item.cloud) await cloudRequest('/drafts/'+item.id,{method:'DELETE'});library.splice(index,1);if(!item.cloud) persistLibrary();renderLibrary();}catch(error){$('status').textContent=error.message;} }; row.append(title,date,open,remove); $('draft-library').append(row); }); }
+$('save-draft').onclick=async()=>{ if(!$('draft').value.trim()) { $('status').textContent='Добавьте текст черновика.'; return; } const item={date:new Date().toISOString(),idea:$('idea').value,draft:$('draft').value,angle:$('angle').value,language:$('language').value}; if(hasCloudSession()){try{await cloudJson('/drafts',{text:item.draft,language:item.language});await loadCloudDrafts();$('status').textContent='Версия сохранена в облачной библиотеке.';}catch(error){$('status').textContent=error.message;}}else{library.unshift(item);if(persistLibrary())$('status').textContent='Версия сохранена только на этом устройстве. Для синхронизации войдите в облако.';renderLibrary();} };
 renderLibrary();
 function safeUrl(value) { try { const url=new URL(value); return ['https:','http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null; } catch { return null; } }
 function addIdea(title,url,angle='') { switchView('workspace'); $('idea').value += `${$('idea').value ? '\n\n' : ''}${title}\nИсточник: ${url}`; if(angle) $('angle').value=angle; save(); $('idea').focus(); $('status').textContent='Источник добавлен в идею. Откройте оригинал и добавьте собственный вывод.'; }
@@ -67,16 +70,16 @@ loadNews();
 
 // Workspace navigation and presentation controls.
 function switchView(name) {
-  const valid=['workspace','library','sources']; if(!valid.includes(name)) name='workspace';
+  const valid=['workspace','ideas','library','sources','accounts']; if(!valid.includes(name)) name='workspace';
   for(const view of valid) { const node=$('view-'+view); node.hidden=view!==name; node.classList.toggle('active-view',view===name); }
   document.querySelectorAll('.nav-item').forEach(button=>{ const selected=button.dataset.view===name; button.classList.toggle('active',selected); if(selected) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current'); });
-  $('breadcrumb-current').textContent={workspace:'Рабочий стол',library:'Мои черновики',sources:'Источники и RSS'}[name];
+  $('breadcrumb-current').textContent={workspace:'Рабочий стол',ideas:'Банк идей',library:'Мои черновики',sources:'Источники и RSS',accounts:'Аккаунты'}[name];
   history.replaceState(null,'','#'+name);
   window.scrollTo({top:0,behavior:'instant'});
 }
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>switchView(button.dataset.view)));
 document.querySelector('.brand').addEventListener('click',event=>{event.preventDefault();switchView('workspace');});
-switchView(location.hash.slice(1)||'workspace');
+switchView(location.hash.startsWith('#linked=')?'accounts':location.hash.slice(1)||'workspace');
 function setEditorMode(preview) {
   $('editing-surface').hidden=preview; $('post-preview').hidden=!preview;
   $('post-preview-text').textContent=$('draft').value.trim() || 'Здесь появится ваш текст. Перейдите в редактор, чтобы начать.';
@@ -100,3 +103,11 @@ document.querySelectorAll('[data-news-filter]').forEach(button=>button.onclick=(
 new MutationObserver(records=>{if(records.some(record=>[...record.addedNodes].some(node=>node.nodeName==='ARTICLE'))) filterNews();}).observe($('news-list'),{childList:true});
 let toastTimer;
 new MutationObserver(()=>{clearTimeout(toastTimer);if($('status').textContent)toastTimer=setTimeout(()=>$('status').textContent='',6500);}).observe($('status'),{childList:true});
+
+initCapture({switchView,putInEditor:(value)=>{ $('idea').value=value;save();setEditorMode(false);switchView('workspace');$('idea').focus(); }});
+window.addEventListener('cloud-session',controls); cloudReady.then(controls);
+
+async function loadCloudDrafts(){if(!hasCloudSession())return;try{const data=await(await cloudRequest('/drafts')).json();library=data.drafts.map(x=>({id:x.id,date:x.created,draft:x.text,language:x.language,cloud:true}));renderLibrary();document.querySelector('.library-banner p').textContent='Облачные версии доступны на всех ваших устройствах после входа.';}catch(error){$('status').textContent=error.message;}}
+cloudReady.then(()=>{if(hasCloudSession())loadCloudDrafts();});window.addEventListener('cloud-session',()=>{if(hasCloudSession())loadCloudDrafts();else{try{library=JSON.parse(localStorage.getItem('draft-library')||'[]');}catch{library=[];}renderLibrary();document.querySelector('.library-banner p').textContent='Локальные версии этого браузера. Для доступа к облачной библиотеке войдите в аккаунт.';}});
+
+initAccounts();
